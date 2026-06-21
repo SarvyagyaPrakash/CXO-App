@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/project_model.dart';
 import '../models/advisor_model.dart';
+import '../models/models.dart';
 import '../services/mock_service.dart';
 
 // --- Scroll Anchor Keys Providers ---
@@ -198,4 +199,71 @@ final filteredAdvisorsProvider = Provider<List<AdvisorModel>>((ref) {
         advisor.skills.any((skill) => skill.toLowerCase().contains(query)) ||
         advisor.biography.toLowerCase().contains(query);
   }).toList();
+});
+
+// --- Notifications State Manager ---
+class NotificationsNotifier extends StateNotifier<List<NotificationModel>> {
+  NotificationsNotifier()
+      : super([
+          NotificationModel(
+            id: 'n1',
+            userId: 'u1',
+            title: 'New Role Match Found',
+            description: 'You have a 96% match for Fractional CFO with Acme Corp.',
+            type: 'info',
+            unread: true,
+            createdAt: DateTime.now(),
+          ),
+          NotificationModel(
+            id: 'n2',
+            userId: 'u1',
+            title: 'Milestone Approved',
+            description: 'Cloud Infrastructure Audit milestone approved and payment released.',
+            type: 'payment',
+            unread: true,
+            createdAt: DateTime.now().subtract(const Duration(hours: 4)),
+          ),
+          NotificationModel(
+            id: 'n3',
+            userId: 'u1',
+            title: 'NDA Contract Awaiting Sign-off',
+            description: 'Please review and digitally sign the non-disclosure agreement.',
+            type: 'contract',
+            unread: true,
+            createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          ),
+        ]);
+
+  void markAllRead() {
+    state = state.map((n) => NotificationModel(
+      id: n.id,
+      userId: n.userId,
+      title: n.title,
+      description: n.description,
+      type: n.type,
+      unread: false,
+      createdAt: n.createdAt,
+    )).toList();
+  }
+
+  void addNotification(String title, String desc, String type) {
+    state = [
+      NotificationModel(
+        id: 'n_${state.length + 1}',
+        userId: 'u1',
+        title: title,
+        description: desc,
+        type: type,
+        unread: true,
+        createdAt: DateTime.now(),
+      ),
+      ...state
+    ];
+  }
+
+  int get unreadCount => state.where((n) => n.unread).length;
+}
+
+final notificationsProvider = StateNotifierProvider<NotificationsNotifier, List<NotificationModel>>((ref) {
+  return NotificationsNotifier();
 });

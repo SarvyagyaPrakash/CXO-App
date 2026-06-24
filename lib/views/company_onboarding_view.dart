@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../theme.dart';
 import '../viewmodels/app_state.dart';
 import '../widgets/custom_button.dart';
@@ -15,47 +16,40 @@ class CompanyOnboardingView extends ConsumerStatefulWidget {
 
 class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
   int _currentStep = 1;
-  final int _totalSteps = 5;
+  final int _totalSteps = 4;
 
-  // Global Keys for step forms
   final _step1Key = GlobalKey<FormState>();
   final _step2Key = GlobalKey<FormState>();
   final _step3Key = GlobalKey<FormState>();
   final _step4Key = GlobalKey<FormState>();
-  final _step5Key = GlobalKey<FormState>();
 
-  // --- Step 1 Controllers & State ---
   final _nameController = TextEditingController();
   final _taglineController = TextEditingController();
   String? _selectedIndustry;
   String? _uploadedLogoPath;
   bool _isUploadingLogo = false;
 
-  // --- Step 2 Controllers & State ---
-  String? _selectedCompanySize;
-  final _foundedController = TextEditingController();
-  final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _foundedController = TextEditingController();
+  String? _selectedOrgType;
+  String? _selectedOrgSize;
+  String? _selectedCompanyAge;
 
-  // --- Step 3 Controllers & State ---
   final _websiteController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   bool _isVerificationLoading = false;
   bool _isVerified = false;
-
-  // --- Step 4 Controllers & State ---
-  final _linkedinController = TextEditingController();
-  final _twitterController = TextEditingController();
-  final _instagramController = TextEditingController();
   final List<TextEditingController> _additionalLinkControllers = [];
 
-  // --- Step 5 Controllers & State ---
+  final _adminNameController = TextEditingController();
+  final _cinController = TextEditingController();
   final _adminEmailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  final _gstinController = TextEditingController();
+  bool _isAdminEmailVerificationLoading = false;
+  bool _isAdminEmailVerified = false;
+  String? _certificateUploadedPath;
+  bool _isUploadingCertificate = false;
   bool _agreeToTerms = false;
   bool _isSubmitting = false;
 
@@ -63,25 +57,21 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
   void dispose() {
     _nameController.dispose();
     _taglineController.dispose();
-    _foundedController.dispose();
-    _locationController.dispose();
     _descriptionController.dispose();
+    _foundedController.dispose();
     _websiteController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
-    _linkedinController.dispose();
-    _twitterController.dispose();
-    _instagramController.dispose();
+    _adminNameController.dispose();
+    _cinController.dispose();
     _adminEmailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    for (var controller in _additionalLinkControllers) {
-      controller.dispose();
+    _gstinController.dispose();
+    for (var c in _additionalLinkControllers) {
+      c.dispose();
     }
     super.dispose();
   }
 
-  // Helper to validate the active step form
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 1:
@@ -98,33 +88,20 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
         }
         return false;
       case 2:
-        if (_step2Key.currentState?.validate() ?? false) {
-          if (_selectedCompanySize == null) {
-            Forms.showErrorToast(context, 'Please select company size.');
-            return false;
-          }
-          return true;
-        }
-        return false;
+        return _step2Key.currentState?.validate() ?? false;
       case 3:
         if (_step3Key.currentState?.validate() ?? false) {
           if (!_isVerified) {
-            Forms.showErrorToast(context, 'Please verify your contact details before proceeding.');
+            Forms.showErrorToast(context, 'Please verify your email before proceeding.');
             return false;
           }
           return true;
         }
         return false;
       case 4:
-        return _step4Key.currentState?.validate() ?? true;
-      case 5:
-        if (_step5Key.currentState?.validate() ?? false) {
+        if (_step4Key.currentState?.validate() ?? false) {
           if (!_agreeToTerms) {
             Forms.showErrorToast(context, 'You must agree to the terms and conditions.');
-            return false;
-          }
-          if (_passwordController.text != _confirmPasswordController.text) {
-            Forms.showErrorToast(context, 'Passwords do not match.');
             return false;
           }
           return true;
@@ -153,7 +130,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
         _currentStep--;
       });
     } else {
-      Navigator.pop(context);
+      context.go('/');
     }
   }
 
@@ -161,39 +138,28 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
     setState(() {
       _isSubmitting = true;
     });
-
-    // Simulate database submission delay
     await Future.delayed(const Duration(milliseconds: 2000));
-
     if (mounted) {
-      // 1. Set global user role state
       ref.read(userRoleProvider.notifier).state = UserRole.company;
-
-      // 2. Clear onboarding dialog and show congratulations
-      Navigator.pop(context);
-      Forms.showSuccessToast(context, 'Institutional Registration complete! Welcome to the Ledger Workspace.');
-
-      // 3. Switch bottom nav to Projects dashboard
-      ref.read(tabNavigationProvider.notifier).setTab(1);
+      Forms.showSuccessToast(context, 'Onboarding complete! Welcome to CXO Connect.');
+      context.go('/signin');
     }
   }
 
-  // Logo simulated upload
   Future<void> _simulateLogoUpload() async {
     setState(() {
       _isUploadingLogo = true;
     });
     await Future.delayed(const Duration(milliseconds: 1200));
     setState(() {
-      _uploadedLogoPath = 'logo_forest_global.png';
+      _uploadedLogoPath = 'company_logo.png';
       _isUploadingLogo = false;
     });
   }
 
-  // Simulated verification check
   Future<void> _simulateVerification() async {
-    if (_phoneController.text.trim().isEmpty || _emailController.text.trim().isEmpty) {
-      Forms.showErrorToast(context, 'Provide contact number & official email to verify.');
+    if (_emailController.text.trim().isEmpty) {
+      Forms.showErrorToast(context, 'Please enter your official email to verify.');
       return;
     }
     setState(() {
@@ -205,90 +171,148 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
       _isVerificationLoading = false;
     });
     if (mounted) {
-      Forms.showSuccessToast(context, 'Credentials verified successfully!');
+      Forms.showSuccessToast(context, 'Email verified successfully!');
     }
+  }
+
+  Future<void> _simulateAdminEmailVerification() async {
+    if (_adminEmailController.text.trim().isEmpty) {
+      Forms.showErrorToast(context, 'Please enter admin email to verify.');
+      return;
+    }
+    setState(() {
+      _isAdminEmailVerificationLoading = true;
+    });
+    await Future.delayed(const Duration(milliseconds: 1500));
+    setState(() {
+      _isAdminEmailVerified = true;
+      _isAdminEmailVerificationLoading = false;
+    });
+    if (mounted) {
+      Forms.showSuccessToast(context, 'Admin email verified successfully!');
+    }
+  }
+
+  Future<void> _simulateCertificateUpload() async {
+    setState(() {
+      _isUploadingCertificate = true;
+    });
+    await Future.delayed(const Duration(milliseconds: 1200));
+    setState(() {
+      _certificateUploadedPath = 'certificate_of_incorporation.pdf';
+      _isUploadingCertificate = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundMidnight,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primaryTeal),
-          onPressed: _prevStep,
-        ),
-        title: Text(
-          'Onboarding',
-          style: GoogleFonts.spaceGrotesk(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(
-            color: AppColors.cardBorder,
-            height: 1.0,
-          ),
-        ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth >= 900;
+          if (isDesktop) {
+            return Row(
+              children: [
+                SizedBox(
+                  width: constraints.maxWidth * 0.38,
+                  child: _buildLeftPanel(),
+                ),
+                SizedBox(
+                  width: constraints.maxWidth * 0.62,
+                  child: _buildRightPanel(),
+                ),
+              ],
+            );
+          }
+          return _buildRightPanel();
+        },
       ),
-      body: Column(
-        children: [
-          // Step progress indicators at top
-          _buildProgressIndicatorHeader(),
+    );
+  }
 
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: _buildCurrentStepForm(),
-              ),
+  Widget _buildLeftPanel() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: AppColors.mintGradient,
+      ),
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.backgroundDark, size: 24),
+            onPressed: () => context.go('/'),
+            padding: EdgeInsets.zero,
+            alignment: Alignment.centerLeft,
+          ),
+          const Spacer(),
+          Text(
+            'CXO\nCONNECT',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 42,
+              fontWeight: FontWeight.bold,
+              color: AppColors.backgroundDark,
+              height: 1.1,
             ),
           ),
-
-          // Bottom navigation actions
-          _buildStickyFooter(),
+          const SizedBox(height: 16),
+          Text(
+            'Join the elite network of corporate leaders and enterprises.',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              color: AppColors.backgroundDark.withOpacity(0.8),
+              height: 1.5,
+            ),
+          ),
+          const Spacer(),
         ],
       ),
     );
   }
 
-  // --- Step & Progress bar Widget Header ---
+  Widget _buildRightPanel() {
+    return Column(
+      children: [
+        _buildProgressIndicatorHeader(),
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: _buildCurrentStepForm(),
+            ),
+          ),
+        ),
+        _buildStickyFooter(),
+      ],
+    );
+  }
+
   Widget _buildProgressIndicatorHeader() {
     double progressPercent = _currentStep / _totalSteps;
     String stepTitle = '';
     switch (_currentStep) {
       case 1:
-        stepTitle = 'Basics';
+        stepTitle = 'Basic Details';
         break;
       case 2:
-        stepTitle = 'Company Details';
+        stepTitle = 'Company Info';
         break;
       case 3:
-        stepTitle = 'Credentials & Verification';
-        break;
-      case 4:
         stepTitle = 'Online Presence';
         break;
-      case 5:
-        stepTitle = 'Account Finalization';
+      case 4:
+        stepTitle = 'Account Setup';
         break;
     }
-
     return Container(
       color: AppColors.backgroundMidnight,
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Text percentages
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -312,8 +336,6 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ],
           ),
           const SizedBox(height: 8),
-
-          // Progress bar line
           Container(
             width: double.infinity,
             height: 6,
@@ -333,19 +355,15 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Visual Circle nodes matching screenshots
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(_totalSteps, (index) {
               int stepNum = index + 1;
               bool isCompleted = stepNum < _currentStep;
               bool isActive = stepNum == _currentStep;
-
               return Expanded(
                 child: Row(
                   children: [
-                    // Node
                     Container(
                       width: 28,
                       height: 28,
@@ -369,14 +387,11 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
                                 style: GoogleFonts.outfit(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: isActive
-                                      ? AppColors.primaryTeal
-                                      : AppColors.textMuted,
+                                  color: isActive ? AppColors.primaryTeal : AppColors.textMuted,
                                 ),
                               ),
                       ),
                     ),
-                    // Connector line (except for last node)
                     if (stepNum < _totalSteps)
                       Expanded(
                         child: Container(
@@ -394,7 +409,6 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
     );
   }
 
-  // Render active step structure
   Widget _buildCurrentStepForm() {
     switch (_currentStep) {
       case 1:
@@ -405,14 +419,11 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
         return _buildStep3Form();
       case 4:
         return _buildStep4Form();
-      case 5:
-        return _buildStep5Form();
       default:
         return const SizedBox.shrink();
     }
   }
 
-  // --- STEP 1: BASIC DETAILS ---
   Widget _buildStep1Form() {
     return Form(
       key: _step1Key,
@@ -430,7 +441,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Let\'s start with some foundational information about your organization to set up your ledger workspace.',
+            'Let\'s start with some foundational information about your organization.',
             style: GoogleFonts.inter(
               fontSize: 13.5,
               color: AppColors.textSecondary,
@@ -438,8 +449,6 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Company Name field
           Text(
             'Company Name',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -449,13 +458,11 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             controller: _nameController,
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-              hintText: 'e.g. Forest Global Corp',
+              hintText: 'e.g. Acme Corp',
             ),
             validator: (val) => val == null || val.trim().isEmpty ? 'Please enter company name' : null,
           ),
           const SizedBox(height: 20),
-
-          // Company Logo upload box
           Text(
             'Company Logo',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -527,8 +534,6 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Industry selector
           Text(
             'Industry',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -553,8 +558,6 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Company Tagline
           Text(
             'Company Tagline',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -568,18 +571,11 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             validator: (val) => val == null || val.trim().isEmpty ? 'Please enter company tagline' : null,
           ),
           const SizedBox(height: 28),
-
-          // Visual block matching "Institutional Trust" card in screenshot 1
-          _buildInfoHeroCard(
-            title: 'Institutional Trust',
-            description: 'Join over 5,000 corporate entities managing their assets with our secure forest-grade infrastructure.',
-          ),
         ],
       ),
     );
   }
 
-  // --- STEP 2: COMPANY PROFILE ---
   Widget _buildStep2Form() {
     return Form(
       key: _step2Key,
@@ -588,7 +584,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Company Profile',
+            'Company Info',
             style: GoogleFonts.spaceGrotesk(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -597,7 +593,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Provide the essential identification details for your corporate entity to proceed with verification.',
+            'Provide detailed information about your organization.',
             style: GoogleFonts.inter(
               fontSize: 13.5,
               color: AppColors.textSecondary,
@@ -605,17 +601,56 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Company Size
           Text(
-            'Company Size',
+            'Description',
+            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _descriptionController,
+            maxLines: 4,
+            maxLength: 500,
+            decoration: const InputDecoration(
+              hintText: 'Tell us about your core mission and business operations...',
+              counterStyle: TextStyle(color: AppColors.textMuted, fontSize: 11),
+            ),
+            validator: (val) => val == null || val.trim().isEmpty ? 'Please enter description' : null,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Organization Type',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            value: _selectedCompanySize,
+            value: _selectedOrgType,
+            hint: Text('Select organization type', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
+            items: ['Private Limited', 'Public Limited', 'LLP', 'Partnership', 'Sole Proprietorship', 'Non-Profit', 'Other']
+                .map((type) => DropdownMenuItem(
+                      value: type,
+                      child: Text(type, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary)),
+                    ))
+                .toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedOrgType = val;
+              });
+            },
+            decoration: const InputDecoration(
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            ),
+            validator: (val) => val == null ? 'Please select organization type' : null,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Organization Size',
+            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: _selectedOrgSize,
             hint: Text('Select size', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
-            items: ['1-10', '11-50', '51-200', '201-500', '500+']
+            items: ['1-10', '11-50', '51-200', '201-500', '500+', '1000+']
                 .map((size) => DropdownMenuItem(
                       value: size,
                       child: Text(size, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary)),
@@ -623,16 +658,40 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
                 .toList(),
             onChanged: (val) {
               setState(() {
-                _selectedCompanySize = val;
+                _selectedOrgSize = val;
               });
             },
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             ),
+            validator: (val) => val == null ? 'Please select organization size' : null,
           ),
           const SizedBox(height: 20),
-
-          // Founded Year
+          Text(
+            'Company Age',
+            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: _selectedCompanyAge,
+            hint: Text('Select company age', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
+            items: ['Less than 1 year', '1-3 years', '3-5 years', '5-10 years', '10+ years']
+                .map((age) => DropdownMenuItem(
+                      value: age,
+                      child: Text(age, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary)),
+                    ))
+                .toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedCompanyAge = val;
+              });
+            },
+            decoration: const InputDecoration(
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            ),
+            validator: (val) => val == null ? 'Please select company age' : null,
+          ),
+          const SizedBox(height: 20),
           Text(
             'Founded Year',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -651,98 +710,12 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
               return null;
             },
           ),
-          const SizedBox(height: 20),
-
-          // HQ Location
-          Text(
-            'HQ Location',
-            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: _locationController,
-            decoration: const InputDecoration(
-              hintText: 'City, Country',
-              prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.textMuted, size: 20),
-            ),
-            validator: (val) => val == null || val.trim().isEmpty ? 'Please enter HQ location' : null,
-          ),
-          const SizedBox(height: 20),
-
-          // Description
-          Text(
-            'Brief Description',
-            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: _descriptionController,
-            maxLines: 4,
-            maxLength: 500,
-            decoration: const InputDecoration(
-              hintText: 'Tell us about your core mission and business operations...',
-              counterStyle: TextStyle(color: AppColors.textMuted, fontSize: 11),
-            ),
-            validator: (val) => val == null || val.trim().isEmpty ? 'Please enter description' : null,
-          ),
-          const SizedBox(height: 20),
-
-          // Small info panel
-          _buildInfoBanner(
-            icon: Icons.info_outline,
-            text: 'This information will be used to generate your official ledger profile and cannot be changed easily later.',
-          ),
-          const SizedBox(height: 24),
-
-          // Visual badges matching screenshot 2
-          _buildInfoHeroCard(
-            title: 'Trusted by 5,000+ Enterprises',
-            description: 'Proven governance and matching security for cross-border engineering teams.',
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.primaryTealDark,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.primaryTeal.withOpacity(0.2)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.shield_outlined, color: AppColors.primaryTeal, size: 24),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ISO 27001 Certified',
-                        style: GoogleFonts.outfit(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryTeal,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Your data security is our highest priority.',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 28),
         ],
       ),
     );
   }
 
-  // --- STEP 3: CONTACT & CREDENTIAL VERIFICATION ---
   Widget _buildStep3Form() {
     return Form(
       key: _step3Key,
@@ -751,7 +724,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Online Presence & Verification',
+            'Online Presence',
             style: GoogleFonts.spaceGrotesk(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -760,7 +733,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Connect your contact details and verify your official company credentials.',
+            'Connect your digital presence and verify your official company credentials.',
             style: GoogleFonts.inter(
               fontSize: 13.5,
               color: AppColors.textSecondary,
@@ -768,10 +741,8 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Website URL
           Text(
-            'Website URL *',
+            'Website URL',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
@@ -789,10 +760,8 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             },
           ),
           const SizedBox(height: 20),
-
-          // Contact Number
           Text(
-            'Contact Number *',
+            'Contact Number',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
@@ -806,10 +775,8 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             validator: (val) => val == null || val.trim().isEmpty ? 'Please enter contact number' : null,
           ),
           const SizedBox(height: 20),
-
-          // Company Email
           Text(
-            'Official Company Email *',
+            'Official Email Address',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
@@ -821,14 +788,12 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
               prefixIcon: Icon(Icons.mail_outline, color: AppColors.textMuted, size: 18),
             ),
             validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Please enter company email';
+              if (val == null || val.trim().isEmpty) return 'Please enter official email';
               if (!val.contains('@')) return 'Enter a valid email address';
               return null;
             },
           ),
           const SizedBox(height: 24),
-
-          // Verification trigger button with dynamic states
           Container(
             width: double.infinity,
             height: 48,
@@ -858,7 +823,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              _isVerified ? 'Verified' : 'Verify Details',
+                              _isVerified ? 'Verified' : 'Verify Email (OTP)',
                               style: GoogleFonts.outfit(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -872,104 +837,11 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Small info panel
-          _buildInfoBanner(
-            icon: Icons.info_outline,
-            text: 'These profiles are used for professional background verification only and remain private.',
-          ),
-          const SizedBox(height: 24),
-
-          _buildPresenceBadges(),
-        ],
-      ),
-    );
-  }
-
-  // --- STEP 4: ONLINE PRESENCE & LINKS ---
-  Widget _buildStep4Form() {
-    return Form(
-      key: _step4Key,
-      child: Column(
-        key: const ValueKey('step_4'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
           Text(
-            'Online Presence',
-            style: GoogleFonts.spaceGrotesk(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Connect your professional digital identity to enhance your institutional verification profile.',
-            style: GoogleFonts.inter(
-              fontSize: 13.5,
-              color: AppColors.textSecondary,
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // LinkedIn Page
-          Text(
-            'LinkedIn Page *',
-            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: _linkedinController,
-            decoration: const InputDecoration(
-              hintText: 'https://linkedin.com/company/your-company',
-              prefixIcon: Icon(Icons.link_outlined, color: AppColors.textMuted, size: 18),
-            ),
-            validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Please enter LinkedIn page';
-              if (!val.contains('linkedin')) return 'Please provide a valid LinkedIn URL';
-              return null;
-            },
-          ),
-          const SizedBox(height: 20),
-
-          // Twitter/X Handle
-          Text(
-            'Twitter/X Handle',
-            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: _twitterController,
-            decoration: const InputDecoration(
-              hintText: '@username',
-              prefixIcon: Icon(Icons.alternate_email_outlined, color: AppColors.textMuted, size: 18),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Instagram Profile
-          Text(
-            'Instagram Profile',
-            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: _instagramController,
-            decoration: const InputDecoration(
-              hintText: 'instagram.com/username',
-              prefixIcon: Icon(Icons.camera_alt_outlined, color: AppColors.textMuted, size: 18),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Dynamic Additional Links (up to 3) matching screenshot 4
-          Text(
-            'Additional Links (optional)',
+            'Additional Links',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 8),
-
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -982,10 +854,10 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
                     Expanded(
                       child: TextFormField(
                         controller: _additionalLinkControllers[index],
-                        decoration: InputDecoration(
-                          hintText: 'https://...',
-                          prefixIcon: const Icon(Icons.link, color: AppColors.textMuted, size: 16),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: const InputDecoration(
+                          hintText: 'https://twitter.com/yourhandle',
+                          prefixIcon: Icon(Icons.link, color: AppColors.textMuted, size: 16),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         ),
                       ),
                     ),
@@ -1007,7 +879,6 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
               );
             },
           ),
-
           if (_additionalLinkControllers.length < 3)
             OutlinedButton.icon(
               icon: const Icon(Icons.add, size: 16),
@@ -1030,24 +901,21 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
                 ),
               ),
             ),
-          const SizedBox(height: 24),
-
-          _buildPresenceBadges(),
+          const SizedBox(height: 28),
         ],
       ),
     );
   }
 
-  // --- STEP 5: FINALIZE YOUR ACCOUNT ---
-  Widget _buildStep5Form() {
+  Widget _buildStep4Form() {
     return Form(
-      key: _step5Key,
+      key: _step4Key,
       child: Column(
-        key: const ValueKey('step_5'),
+        key: const ValueKey('step_4'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Finalize Your Account',
+            'Account Setup',
             style: GoogleFonts.spaceGrotesk(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -1056,7 +924,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Secure your corporate ledger access by setting up your administrative credentials.',
+            'Finalize your administrative account and legal credentials.',
             style: GoogleFonts.inter(
               fontSize: 13.5,
               color: AppColors.textSecondary,
@@ -1064,8 +932,39 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Admin Email Address
+          Text(
+            'Account Admin Name',
+            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _adminNameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              hintText: 'John Doe',
+            ),
+            validator: (val) => val == null || val.trim().isEmpty ? 'Please enter admin name' : null,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'CIN Number',
+            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _cinController,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              hintText: 'U12345MH2020PTC123456',
+            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) return 'Please enter CIN number';
+              if (val.trim().length != 21) return 'CIN must be exactly 21 characters';
+              if (!RegExp(r'^[A-Za-z0-9]{21}$').hasMatch(val.trim())) return 'CIN must be alphanumeric (21 characters)';
+              return null;
+            },
+          ),
+          const SizedBox(height: 20),
           Text(
             'Admin Email Address',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -1076,6 +975,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
               hintText: 'admin@company.com',
+              prefixIcon: Icon(Icons.mail_outline, color: AppColors.textMuted, size: 18),
             ),
             validator: (val) {
               if (val == null || val.trim().isEmpty) return 'Please enter admin email';
@@ -1083,57 +983,141 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
               return null;
             },
           ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: _isAdminEmailVerified ? AppColors.primaryTealDark : AppColors.accentBlueDark,
+              border: Border.all(
+                color: _isAdminEmailVerified ? AppColors.primaryTeal : AppColors.cardBorder,
+                width: 1.2,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: (_isAdminEmailVerified || _isAdminEmailVerificationLoading) ? null : _simulateAdminEmailVerification,
+                child: Center(
+                  child: _isAdminEmailVerificationLoading
+                      ? const CircularProgressIndicator(color: AppColors.primaryTeal)
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _isAdminEmailVerified ? Icons.check_circle : Icons.verified_outlined,
+                              color: _isAdminEmailVerified ? AppColors.primaryTeal : AppColors.textPrimary,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isAdminEmailVerified ? 'Verified' : 'Verify Admin Email (OTP)',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: _isAdminEmailVerified ? AppColors.primaryTeal : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
-
-          // Password
           Text(
-            'Password',
+            'GSTIN Number',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
           TextFormField(
-            controller: _passwordController,
-            obscureText: _obscurePassword,
-            decoration: InputDecoration(
-              hintText: '********',
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                  color: AppColors.textMuted,
-                  size: 20,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-              ),
+            controller: _gstinController,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              hintText: '22AAAAA0000A1Z5',
             ),
             validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Please enter password';
-              if (val.length < 8) return 'Password must be at least 8 characters';
+              if (val == null || val.trim().isEmpty) return 'Please enter GSTIN number';
+              final clean = val.trim();
+              if (clean.length != 15) return 'GSTIN must be exactly 15 characters';
+              if (!RegExp(r'^[A-Za-z0-9]{15}$').hasMatch(clean)) return 'GSTIN must be alphanumeric (15 characters)';
               return null;
             },
           ),
           const SizedBox(height: 20),
-
-          // Confirm Password
           Text(
-            'Confirm Password',
+            'Certificate of Incorporation (optional)',
             style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
-          TextFormField(
-            controller: _confirmPasswordController,
-            obscureText: _obscureConfirmPassword,
-            decoration: const InputDecoration(
-              hintText: '********',
+          GestureDetector(
+            onTap: _isUploadingCertificate ? null : _simulateCertificateUpload,
+            child: Container(
+              width: double.infinity,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.backgroundMidnight,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.cardBorder, width: 1.5, style: BorderStyle.solid),
+              ),
+              child: _isUploadingCertificate
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
+                  : _certificateUploadedPath != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check_circle, color: AppColors.success, size: 36),
+                              const SizedBox(height: 8),
+                              Text(
+                                _certificateUploadedPath!,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Tap to re-upload',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.upload_file_outlined, color: AppColors.primaryTeal, size: 36),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Upload Certificate',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryTeal,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'PDF or image (max 5MB)',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
             ),
-            validator: (val) => val == null || val.trim().isEmpty ? 'Please confirm password' : null,
           ),
           const SizedBox(height: 24),
-
-          // Agree to terms checkbox row matching screenshot 5
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1169,14 +1153,7 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const TextSpan(text: ' and the corporate privacy policy regarding '),
-                      TextSpan(
-                        text: 'institutional data security.',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
+                      const TextSpan(text: ' and the corporate privacy policy regarding institutional data security.'),
                     ],
                   ),
                 ),
@@ -1184,33 +1161,19 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ],
           ),
           const SizedBox(height: 32),
-
-          // Administrative encryption panels matching bottom of screenshot 5
-          _buildInfoBanner(
-            icon: Icons.security_outlined,
-            text: '256-bit institutional grade security keeps your organizational accounts and metadata fully encrypted.',
-          ),
-          const SizedBox(height: 12),
-          _buildInfoBanner(
-            icon: Icons.account_balance_wallet_outlined,
-            text: 'Multi-Org Ready: Swiftly configure sub-entities or switch workspaces after completion.',
-          ),
         ],
       ),
     );
   }
 
-  // --- STICKY FOOTER ---
   Widget _buildStickyFooter() {
     bool isLastStep = _currentStep == _totalSteps;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       color: AppColors.backgroundMidnight,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Back button
           TextButton.icon(
             icon: const Icon(Icons.chevron_left, color: AppColors.textSecondary, size: 20),
             label: Text(
@@ -1223,12 +1186,10 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
             ),
             onPressed: _prevStep,
           ),
-
-          // Next / Complete Button
           _isSubmitting
               ? const CircularProgressIndicator(color: AppColors.primaryTeal)
               : CustomButton(
-                  text: isLastStep ? 'Complete Setup' : 'Next',
+                  text: isLastStep ? 'Submit' : 'Next',
                   icon: Icon(
                     isLastStep ? Icons.check : Icons.arrow_forward,
                     color: AppColors.backgroundDark,
@@ -1237,136 +1198,6 @@ class _CompanyOnboardingViewState extends ConsumerState<CompanyOnboardingView> {
                   onTap: _nextStep,
                   width: 160,
                 ),
-        ],
-      ),
-    );
-  }
-
-  // Info Block layout helper
-  Widget _buildInfoHeroCard({required String title, required String description}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder, width: 1.0),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primaryTeal,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            description,
-            style: GoogleFonts.inter(
-              fontSize: 12.5,
-              color: AppColors.textSecondary,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Small info banner helper
-  Widget _buildInfoBanner({required IconData icon, required String text}) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundMidnight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder, width: 1.0),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.textMuted, size: 16),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 11.5,
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Repeated presence/trust badges in step 3 and 4
-  Widget _buildPresenceBadges() {
-    return Column(
-      children: [
-        _buildTrustBadgeCard(
-          icon: Icons.verified_user_outlined,
-          title: 'Trusted Network',
-          subtitle: 'Validated professional presence.',
-        ),
-        const SizedBox(height: 12),
-        _buildTrustBadgeCard(
-          icon: Icons.vpn_key_outlined,
-          title: 'Secure Connection',
-          subtitle: 'End-to-end encrypted data entry.',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTrustBadgeCard({required IconData icon, required String title, required String subtitle}) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.backgroundDark,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: AppColors.primaryTeal, size: 18),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

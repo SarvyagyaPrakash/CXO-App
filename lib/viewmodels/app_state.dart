@@ -267,3 +267,26 @@ class NotificationsNotifier extends StateNotifier<List<NotificationModel>> {
 final notificationsProvider = StateNotifierProvider<NotificationsNotifier, List<NotificationModel>>((ref) {
   return NotificationsNotifier();
 });
+
+// --- Demo State ---
+class DemoState {
+  final bool isDemo;
+  final bool isCompany;
+  final bool isExpert;
+
+  DemoState({
+    this.isDemo = false,
+    this.isCompany = false,
+    this.isExpert = false,
+  });
+
+  DemoState copyWith({bool? isDemo, bool? isCompany, bool? isExpert}) {
+    return DemoState(
+      isDemo: isDemo ?? this.isDemo,
+      isCompany: isCompany ?? this.isCompany,
+      isExpert: isExpert ?? this.isExpert,
+    );
+  }
+}
+
+final demoStateProvider = StateProvider<DemoState>((ref) => DemoState());

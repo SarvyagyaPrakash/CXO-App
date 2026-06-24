@@ -30,7 +30,8 @@ class SignInView extends ConsumerStatefulWidget {
 class _SignInViewState extends ConsumerState<SignInView> {
   late bool isCompany;
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _otpController = TextEditingController();
+  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
   bool otpSent = false;
   bool useMagicLink = false;
 
@@ -38,6 +39,18 @@ class _SignInViewState extends ConsumerState<SignInView> {
   void initState() {
     super.initState();
     isCompany = widget.initialRole == 'company' || widget.initialRole != 'expert';
+  }
+
+  @override
+  void dispose() {
+    for (final c in _otpControllers) {
+      c.dispose();
+    }
+    for (final f in _otpFocusNodes) {
+      f.dispose();
+    }
+    _emailController.dispose();
+    super.dispose();
   }
 
   @override
@@ -141,7 +154,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              'Company',
+                              'Sign In as Company',
                               style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.bold,
                                 color: isCompany ? Colors.white : AppColors.lightTextSecondary,
@@ -164,7 +177,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              'Expert Advisor',
+                              'Sign In as Expert',
                               style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.bold,
                                 color: !isCompany ? Colors.white : AppColors.lightTextSecondary,
@@ -219,6 +232,11 @@ class _SignInViewState extends ConsumerState<SignInView> {
                       final email = _emailController.text.trim();
                       if (email == 'demo@cxo.com') {
                         ref.read(userRoleProvider.notifier).state = isCompany ? UserRole.company : UserRole.expert;
+                        ref.read(demoStateProvider.notifier).state = DemoState(
+                          isDemo: true,
+                          isCompany: isCompany,
+                          isExpert: !isCompany,
+                        );
                         Forms.showSuccessToast(context, 'Signed in as Demo ${isCompany ? 'Company' : 'Expert'}.');
                         context.go(isCompany ? '/company-dashboard' : '/expert-dashboard');
                       } else if (email.isEmpty) {
@@ -247,16 +265,53 @@ class _SignInViewState extends ConsumerState<SignInView> {
                     style: GoogleFonts.inter(color: AppColors.lightTextSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: _otpController,
-                    style: const TextStyle(color: AppColors.lightTextPrimary, letterSpacing: 8, fontSize: 18),
-                    textAlign: TextAlign.center,
-                    maxLength: 6,
-                    decoration: const InputDecoration(
-                      hintText: '000000',
-                      counterText: '',
+                  if (useMagicLink && !isCompany)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          'Magic link sent! Check your inbox.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.mintTeal,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: List.generate(6, (i) {
+                        return SizedBox(
+                          width: 50,
+                          height: 60,
+                          child: TextField(
+                            controller: _otpControllers[i],
+                            focusNode: _otpFocusNodes[i],
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.lightTextPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLength: 1,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              counterText: '',
+                            ),
+                            onChanged: (v) {
+                              if (v.isNotEmpty && i < 5) {
+                                _otpFocusNodes[i + 1].requestFocus();
+                              } else if (v.isEmpty && i > 0) {
+                                _otpFocusNodes[i - 1].requestFocus();
+                              }
+                            },
+                          ),
+                        );
+                      }),
                     ),
-                  ),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: () {
@@ -295,6 +350,11 @@ class _SignInViewState extends ConsumerState<SignInView> {
                   onPressed: () {
                     _emailController.text = 'demo@cxo.com';
                     ref.read(userRoleProvider.notifier).state = isCompany ? UserRole.company : UserRole.expert;
+                    ref.read(demoStateProvider.notifier).state = DemoState(
+                      isDemo: true,
+                      isCompany: isCompany,
+                      isExpert: !isCompany,
+                    );
                     Forms.showSuccessToast(context, 'Demo Mode Activated');
                     context.go(isCompany ? '/company-dashboard' : '/expert-dashboard');
                   },
@@ -3573,10 +3633,11 @@ class _ExpertEarningsViewState extends ConsumerState<ExpertEarningsView> {
                         'Track your income, invoices, and payment history',
                         style: TextStyle(color: AppColors.lightTextSecondary, fontSize: 13),
                       ),
-                    ],
-                  ),
-                ),
-                Row(
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
                   children: [
                     OutlinedButton.icon(
                       onPressed: () => Forms.showSuccessToast(context, 'Exporting statement PDF...'),
@@ -5817,7 +5878,7 @@ class _EngagementWorkspaceViewState extends ConsumerState<EngagementWorkspaceVie
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -5847,6 +5908,7 @@ class _EngagementWorkspaceViewState extends ConsumerState<EngagementWorkspaceVie
             Tab(text: 'Milestones Delivery'),
             Tab(text: 'Collaboration Chat'),
             Tab(text: 'NDA & Contracts'),
+            Tab(text: 'Activity Feed'),
           ],
         ),
       ),
@@ -5856,6 +5918,7 @@ class _EngagementWorkspaceViewState extends ConsumerState<EngagementWorkspaceVie
           _buildMilestonesTab(milestones, userRole, e),
           _buildMessagesTab(),
           _buildContractsTab(),
+          _buildActivityFeed(),
         ],
       ),
     );
@@ -6025,6 +6088,56 @@ class _EngagementWorkspaceViewState extends ConsumerState<EngagementWorkspaceVie
       ),
     );
   }
+
+  Widget _buildActivityFeed() {
+    final activities = [
+      {'user': 'Sarah Jenkins', 'action': 'submitted Milestone 2 deliverables', 'time': '2h ago', 'type': 'submission'},
+      {'user': 'Arjun Mehta', 'action': 'funded Escrow for Phase 2', 'time': '4h ago', 'type': 'funding'},
+      {'user': 'PMO System', 'action': 'approved NDA compliance check', 'time': '6h ago', 'type': 'approval'},
+      {'user': 'Sarah Jenkins', 'action': 'uploaded architecture blueprint v3', 'time': '1d ago', 'type': 'upload'},
+      {'user': 'Arjun Mehta', 'action': 'requested milestone scope revision', 'time': '1d ago', 'type': 'request'},
+      {'user': 'PMO System', 'action': 'released escrow payment for Milestone 1', 'time': '2d ago', 'type': 'payment'},
+      {'user': 'Sarah Jenkins', 'action': 'joined workspace', 'time': '3d ago', 'type': 'join'},
+      {'user': 'Arjun Mehta', 'action': 'added Q3 OKR document', 'time': '3d ago', 'type': 'upload'},
+    ];
+
+    IconData _iconForType(String type) {
+      switch (type) {
+        case 'submission': return Icons.upload_file;
+        case 'funding': return Icons.account_balance;
+        case 'approval': return Icons.verified;
+        case 'upload': return Icons.cloud_upload;
+        case 'request': return Icons.rate_review;
+        case 'payment': return Icons.payments;
+        case 'join': return Icons.person_add;
+        default: return Icons.circle;
+      }
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(28.0),
+      itemCount: activities.length,
+      itemBuilder: (context, index) {
+        final a = activities[index];
+        final icon = _iconForType(a['type'] as String);
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.mintTeal.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppColors.mintTeal, size: 20),
+            ),
+            title: Text('${a['user']} ${a['action']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            trailing: Text(a['time'] as String, style: const TextStyle(fontSize: 11, color: AppColors.lightTextSecondary)),
+          ),
+        );
+      },
+    );
+  }
 }
 
 // =========================================================================
@@ -6055,6 +6168,10 @@ class _CompanyDashboardViewState extends ConsumerState<CompanyDashboardView> {
           children: [
             // Welcome banner
             _buildWelcomeBanner(),
+            const SizedBox(height: 28),
+
+            // Engagement metrics dials
+            _buildEngagementMetricsGrid(),
             const SizedBox(height: 28),
 
             // KPI grid
@@ -6232,6 +6349,63 @@ class _CompanyDashboardViewState extends ConsumerState<CompanyDashboardView> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildEngagementMetricsGrid() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 0.9,
+      children: [
+        _buildMetricDial('Active Workspaces', 8, const Color(0xFF0EB59A)),
+        _buildMetricDial('Pending Approvals', 3, const Color(0xFFF59E0B)),
+        _buildMetricDial('Requirements Posted', 5, const Color(0xFF134E40)),
+        _buildMetricDial('Matches Found', 12, const Color(0xFF3B82F6)),
+      ],
+    );
+  }
+
+  Widget _buildMetricDial(String label, int count, Color color) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 64,
+              height: 64,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: CircularProgressIndicator(
+                      value: count / 20.0,
+                      strokeWidth: 5,
+                      backgroundColor: color.withOpacity(0.15),
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  ),
+                  Text(
+                    '$count',
+                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(label, textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 11, color: AppColors.lightTextSecondary)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -6788,51 +6962,119 @@ class ExpertDiscoveryCatalogView extends ConsumerStatefulWidget {
 class _ExpertDiscoveryCatalogViewState extends ConsumerState<ExpertDiscoveryCatalogView> {
   final Set<String> _selectedCompareIds = {};
   String _selectedIndustry = 'All';
+  bool _isGridView = true;
+  bool _showFilters = false;
+
+  // Filter state
+  String _roleTypeFilter = 'All';
+  String _availabilityFilter = 'All';
+  String _locationFilter = 'All';
+  RangeValues _experienceRange = const RangeValues(0, 30);
+  RangeValues _budgetRange = const RangeValues(0, 10);
 
   @override
   Widget build(BuildContext context) {
     final advisors = ref.watch(filteredAdvisorsProvider);
+    final bool isWide = MediaQuery.of(context).size.width > 1000;
 
     final filteredAdvisors = advisors.where((advisor) {
-      if (_selectedIndustry == 'All') return true;
-      return advisor.industry.toLowerCase().contains(_selectedIndustry.toLowerCase());
+      if (_selectedIndustry != 'All' && !advisor.industry.toLowerCase().contains(_selectedIndustry.toLowerCase())) return false;
+      if (_roleTypeFilter != 'All' && !advisor.role.toLowerCase().contains(_roleTypeFilter.toLowerCase())) return false;
+      if (_availabilityFilter != 'All' && !advisor.location.toLowerCase().contains(_availabilityFilter.toLowerCase())) return false;
+      if (_locationFilter != 'All') {
+        if (_locationFilter == 'Remote' && !advisor.location.toLowerCase().contains('remote')) return false;
+        if (_locationFilter == 'Hybrid' && !advisor.location.toLowerCase().contains('hybrid')) return false;
+        if (_locationFilter == 'In-office' && advisor.location.toLowerCase().contains('remote')) return false;
+      }
+      if (advisor.yearsOfExperience < _experienceRange.start.toInt() || advisor.yearsOfExperience > _experienceRange.end.toInt()) return false;
+      return true;
     }).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F5),
-      body: Stack(
+      body: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Filter drawer panel (visible when wide)
+          if (isWide)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: _showFilters ? 280 : 0,
+              child: _showFilters ? _buildFilterPanel() : null,
+            ),
+          Expanded(
+            child: Stack(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Discover Vetted Executives',
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF134E40),
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Discover Vetted Executives',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF134E40),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Direct access to top 3% fractional and interim leaders.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  color: AppColors.lightTextSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Direct access to top 3% fractional and interim leaders.',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: AppColors.lightTextSecondary,
+                          // Grid/List toggle + filter toggle
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(_showFilters ? Icons.filter_alt : Icons.filter_alt_outlined, color: const Color(0xFF134E40)),
+                                onPressed: () {
+                                  if (isWide) {
+                                    setState(() { _showFilters = !_showFilters; });
+                                  } else {
+                                    showModalBottomSheet(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.white,
+                                      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                                      builder: (_) => SizedBox(
+                                        height: MediaQuery.of(context).size.height * 0.7,
+                                        child: _buildFilterPanel(),
+                                      ),
+                                    );
+                                  }
+                                },
+                                tooltip: 'Toggle Filters',
+                              ),
+                              const SizedBox(width: 4),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.lightBorder),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildViewToggleButton(Icons.grid_view, true),
+                                    _buildViewToggleButton(Icons.view_list, false),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                        ],
+                      ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -6900,13 +7142,14 @@ class _ExpertDiscoveryCatalogViewState extends ConsumerState<ExpertDiscoveryCata
                             ],
                           ),
                         )
-                      : GridView.builder(
-                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 420,
-                            mainAxisExtent: 280,
-                            crossAxisSpacing: 20,
-                            mainAxisSpacing: 20,
-                          ),
+                      : _isGridView
+                          ? GridView.builder(
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 420,
+                                mainAxisExtent: 280,
+                                crossAxisSpacing: 20,
+                                mainAxisSpacing: 20,
+                              ),
                           itemCount: filteredAdvisors.length,
                           itemBuilder: (context, index) {
                             final advisor = filteredAdvisors[index];
@@ -7047,7 +7290,51 @@ class _ExpertDiscoveryCatalogViewState extends ConsumerState<ExpertDiscoveryCata
                               ),
                             );
                           },
-                        ),
+                        )
+                          : ListView.builder(
+                              itemCount: filteredAdvisors.length,
+                              padding: EdgeInsets.zero,
+                              itemBuilder: (context, index) {
+                                final advisor = filteredAdvisors[index];
+                                final isSelectedForCompare = _selectedCompareIds.contains(advisor.id);
+                                return Card(
+                                  elevation: 0,
+                                  color: Colors.white,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color: isSelectedForCompare ? const Color(0xFF0EB59A) : AppColors.lightBorder,
+                                      width: isSelectedForCompare ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      radius: 24,
+                                      backgroundImage: NetworkImage(advisor.avatarUrl),
+                                      backgroundColor: const Color(0xFF134E40),
+                                    ),
+                                    title: Text(advisor.name, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF134E40))),
+                                    subtitle: Text('${advisor.role} · ${advisor.yearsOfExperience}yrs exp', style: GoogleFonts.inter(fontSize: 12, color: AppColors.lightTextSecondary)),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(isSelectedForCompare ? Icons.check_circle : Icons.add_circle_outline, color: isSelectedForCompare ? const Color(0xFF0EB59A) : AppColors.lightPrimary, size: 20),
+                                          onPressed: () { setState(() { if (isSelectedForCompare) { _selectedCompareIds.remove(advisor.id); } else { _selectedCompareIds.add(advisor.id); } }); },
+                                        ),
+                                        const SizedBox(width: 4),
+                                        ElevatedButton(
+                                          onPressed: () => context.go('/experts/${advisor.id}'),
+                                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF134E40), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                                          child: const Text('View', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                 ),
               ],
             ),
@@ -7126,6 +7413,90 @@ class _ExpertDiscoveryCatalogViewState extends ConsumerState<ExpertDiscoveryCata
             ),
         ],
       ),
+    ),
+      ],
+    ),
+    );
+  }
+
+  Widget _buildViewToggleButton(IconData icon, bool isGrid) {
+    final bool active = _isGridView == isGrid;
+    return InkWell(
+      onTap: () { setState(() { _isGridView = isGrid; }); },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF134E40) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(icon, size: 18, color: active ? Colors.white : const Color(0xFF134E40)),
+      ),
+    );
+  }
+
+  Widget _buildFilterPanel() {
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(right: BorderSide(color: AppColors.lightBorder)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Filters', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+            const SizedBox(height: 20),
+            _buildFilterDropdown('Role Type', ['All', 'Fractional', 'Interim', 'Advisory'], _roleTypeFilter, (v) { setState(() { _roleTypeFilter = v!; }); }),
+            const SizedBox(height: 16),
+            _buildFilterDropdown('Industry', ['All', 'FinTech', 'SaaS', 'HealthTech', 'Logistics'], _selectedIndustry, (v) { setState(() { _selectedIndustry = v!; }); }),
+            const SizedBox(height: 16),
+            _buildFilterDropdown('Availability', ['All', 'Full-time', 'Part-time', 'Advisory'], _availabilityFilter, (v) { setState(() { _availabilityFilter = v!; }); }),
+            const SizedBox(height: 16),
+            _buildFilterDropdown('Location', ['All', 'Remote', 'Hybrid', 'In-office'], _locationFilter, (v) { setState(() { _locationFilter = v!; }); }),
+            const SizedBox(height: 16),
+            Text('Experience (years)', style: GoogleFonts.inter(fontSize: 12, color: AppColors.lightTextSecondary)),
+            RangeSlider(
+              values: _experienceRange,
+              min: 0, max: 30, divisions: 30,
+              labels: RangeLabels('${_experienceRange.start.toInt()}', '${_experienceRange.end.toInt()}'),
+              onChanged: (v) { setState(() { _experienceRange = v; }); },
+              activeColor: const Color(0xFF0EB59A),
+            ),
+            const SizedBox(height: 8),
+            Text('Monthly Budget (₹L)', style: GoogleFonts.inter(fontSize: 12, color: AppColors.lightTextSecondary)),
+            RangeSlider(
+              values: _budgetRange,
+              min: 0, max: 10, divisions: 10,
+              labels: RangeLabels('${_budgetRange.start.toInt()}L', '${_budgetRange.end.toInt()}L'),
+              onChanged: (v) { setState(() { _budgetRange = v; }); },
+              activeColor: const Color(0xFF0EB59A),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterDropdown(String label, List<String> items, String value, ValueChanged<String?> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.lightTextSecondary)),
+        const SizedBox(height: 4),
+        DropdownButtonFormField<String>(
+          value: value,
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: GoogleFonts.inter(fontSize: 13)))).toList(),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.lightBorder)),
+            filled: true, fillColor: const Color(0xFFF4F7F5),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -7138,7 +7509,21 @@ class DetailedExpertProfileView extends ConsumerStatefulWidget {
   ConsumerState<DetailedExpertProfileView> createState() => _DetailedExpertProfileViewState();
 }
 
-class _DetailedExpertProfileViewState extends ConsumerState<DetailedExpertProfileView> {
+class _DetailedExpertProfileViewState extends ConsumerState<DetailedExpertProfileView> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final advisors = MockService.getMockAdvisors();
@@ -7160,301 +7545,364 @@ class _DetailedExpertProfileViewState extends ConsumerState<DetailedExpertProfil
           onPressed: () => context.go('/experts'),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Card(
-                elevation: 0,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.lightBorder),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundImage: NetworkImage(advisor.avatarUrl),
-                        backgroundColor: const Color(0xFF134E40),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  advisor.name,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF134E40),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                if (advisor.isVetted)
-                                  const Icon(Icons.verified, color: Color(0xFF0EB59A), size: 20),
-                              ],
-                            ),
-                            Text(
-                              advisor.role,
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                color: AppColors.lightTextSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(Icons.star, color: Colors.amber, size: 16),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${advisor.rating} Rating',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.lightPrimary,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Icon(Icons.business, color: Colors.grey[400], size: 16),
-                                const SizedBox(width: 4),
-                                Text(
-                                  advisor.industry,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    color: AppColors.lightTextSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              children: [
-                                _buildBadge(Icons.location_on_outlined, advisor.location),
-                                _buildBadge(Icons.work_outline, '${advisor.yearsOfExperience} yrs Experience'),
-                                _buildBadge(Icons.history, 'Prev: ${advisor.lastKnownCompany}'),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
+      body: Column(
+        children: [
+          // Header banner card
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            child: Card(
+              elevation: 0,
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: AppColors.lightBorder),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 36,
+                      backgroundImage: NetworkImage(advisor.avatarUrl),
+                      backgroundColor: const Color(0xFF134E40),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ElevatedButton(
-                            onPressed: isRequested ? null : () => _showRequestIntroDialog(advisor),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isRequested ? Colors.grey : const Color(0xFF134E40),
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: Colors.grey[200],
-                              disabledForegroundColor: Colors.grey[500],
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: Text(
-                              isRequested ? 'Intro Requested' : 'Request Introduction',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(advisor.name, style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                              ),
+                              if (advisor.isVetted) const Icon(Icons.verified, color: Color(0xFF0EB59A), size: 18),
+                            ],
                           ),
+                          Text(advisor.role, style: GoogleFonts.inter(fontSize: 13, color: AppColors.lightTextSecondary)),
                           const SizedBox(height: 6),
-                          Text(
-                            'Average SLA response: <4h',
-                            style: GoogleFonts.inter(fontSize: 10, color: AppColors.lightTextSecondary),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              _buildBadge(Icons.location_on_outlined, advisor.location),
+                              _buildBadge(Icons.work_outline, '${advisor.yearsOfExperience} yrs'),
+                              _buildBadge(Icons.star, '${advisor.rating}'),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    ElevatedButton(
+                      onPressed: isRequested ? null : () => _showRequestIntroDialog(advisor),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isRequested ? Colors.grey : const Color(0xFF134E40),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey[200],
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text(isRequested ? 'Requested' : 'Request Intro', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
-              Row(
+            ),
+          ),
+          // Tabs
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: const Color(0xFF134E40),
+              unselectedLabelColor: AppColors.lightTextSecondary,
+              indicatorColor: const Color(0xFF0EB59A),
+              labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+              tabs: const [
+                Tab(text: 'About'),
+                Tab(text: 'Experience'),
+                Tab(text: 'Case Studies'),
+                Tab(text: 'Rate & Availability'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildAboutTab(advisor),
+                _buildExperienceTab(advisor),
+                _buildCaseStudiesTab(),
+                _buildRateAvailabilityTab(advisor),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAboutTab(AdvisorModel advisor) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Card(
+            elevation: 0, color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Text('Biography', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                  const SizedBox(height: 12),
+                  Text(advisor.biography, style: GoogleFonts.inter(fontSize: 14, color: AppColors.lightTextSecondary, height: 1.5)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            elevation: 0, color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Services', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                  const SizedBox(height: 12),
+                  ...['Strategic Advisory', 'Fractional Leadership', 'Interim Management', 'Board Consulting'].map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
                       children: [
-                        Card(
-                          elevation: 0,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: const BorderSide(color: AppColors.lightBorder),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Executive Biography',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF134E40),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  advisor.biography,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: AppColors.lightTextSecondary,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Card(
-                          elevation: 0,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: const BorderSide(color: AppColors.lightBorder),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Operational Career Timeline',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF134E40),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _buildTimelineItem(
-                                  company: advisor.lastKnownCompany,
-                                  role: advisor.role.replaceAll('Former ', ''),
-                                  period: '2019 - 2026',
-                                  desc: 'Directed global organizational design, core platform scalability architecture audits, and spearheaded high-capacity transaction handling.',
-                                ),
-                                _buildTimelineDivider(),
-                                _buildTimelineItem(
-                                  company: 'Global Tech Consulting Corp',
-                                  role: 'SVP of Product Engineering',
-                                  period: '2012 - 2019',
-                                  desc: 'Built custom SaaS execution protocols, established distributed engineering centers of excellence, and managed 100+ global personnel.',
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        const Icon(Icons.check_circle, color: Color(0xFF0EB59A), size: 16),
+                        const SizedBox(width: 8),
+                        Text(s, style: GoogleFonts.inter(fontSize: 13, color: AppColors.lightTextSecondary)),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Card(
-                          elevation: 0,
-                          color: const Color(0xFF134E40),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Scope & Retainer Options',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Secured via PMO Escrow Milestones',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: const Color(0xFF0EB59A),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                _buildRetainerCard(
-                                  title: 'Advisory Retainer',
-                                  price: '₹1.5L / mo',
-                                  hours: '10 hrs / week',
-                                  isSelected: true,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildRetainerCard(
-                                  title: 'Fractional Operator',
-                                  price: '₹2.8L / mo',
-                                  hours: '20 hrs / week',
-                                  isSelected: false,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Card(
-                          elevation: 0,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: const BorderSide(color: AppColors.lightBorder),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Core Competencies',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF134E40),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: advisor.skills.map((skill) {
-                                    return Chip(
-                                      label: Text(skill, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF134E40))),
-                                      backgroundColor: const Color(0xFFF4F7F5),
-                                      side: BorderSide.none,
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  )),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            elevation: 0, color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Languages', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8, runSpacing: 8,
+                    children: ['English (Native)', 'Hindi (Fluent)', 'Spanish (Business)'].map((l) => Chip(
+                      label: Text(l, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF134E40))),
+                      backgroundColor: const Color(0xFFF4F7F5), side: BorderSide.none,
+                    )).toList(),
                   ),
                 ],
               ),
-            ],
+            ),
           ),
+          const SizedBox(height: 16),
+          Card(
+            elevation: 0, color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Core Competencies', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8, runSpacing: 8,
+                    children: advisor.skills.map((skill) => Chip(
+                      label: Text(skill, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF134E40))),
+                      backgroundColor: const Color(0xFFF4F7F5), side: BorderSide.none,
+                    )).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExperienceTab(AdvisorModel advisor) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          _buildTimelineItem(
+            company: advisor.lastKnownCompany,
+            role: advisor.role.replaceAll('Former ', ''),
+            period: '2019 - 2026',
+            desc: 'Directed global organizational design, core platform scalability architecture audits, and spearheaded high-capacity transaction handling.',
+          ),
+          _buildTimelineDivider(),
+          _buildTimelineItem(
+            company: 'Global Tech Consulting Corp',
+            role: 'SVP of Product Engineering',
+            period: '2012 - 2019',
+            desc: 'Built custom SaaS execution protocols, established distributed engineering centers of excellence, and managed 100+ global personnel.',
+          ),
+          _buildTimelineDivider(),
+          _buildTimelineItem(
+            company: 'InnovateStart Inc.',
+            role: 'VP of Engineering',
+            period: '2008 - 2012',
+            desc: 'Led product-driven engineering organization, scaling from 15 to 80 engineers across 3 continents.',
+          ),
+          _buildTimelineDivider(),
+          _buildTimelineItem(
+            company: 'Pinnacle Systems Ltd.',
+            role: 'Senior Engineering Manager',
+            period: '2004 - 2008',
+            desc: 'Managed cross-functional delivery teams for enterprise SaaS products in the fintech domain.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCaseStudiesTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          _buildCollapsibleCaseStudy(
+            title: 'Digital Transformation at MegaBank',
+            client: 'MegaBank Corp.',
+            outcome: '40% cost reduction, 2x delivery velocity',
+            details: 'Led a full-stack digital transformation initiative migrating 200+ legacy services to cloud-native microservices architecture. Reduced infrastructure costs by 40% and improved deployment frequency by 200%.',
+          ),
+          const SizedBox(height: 12),
+          _buildCollapsibleCaseStudy(
+            title: 'GTM Strategy for FinTech Unicorn',
+            client: 'PayFlow Inc.',
+            outcome: '₹12Cr revenue in first 2 quarters',
+            details: 'Architected the go-to-market strategy and built the core payments platform from ground up. Scaled engineering from 5 to 50 engineers in 8 months. Achieved PCI-DSS compliance and SOC2 certification.',
+          ),
+          const SizedBox(height: 12),
+          _buildCollapsibleCaseStudy(
+            title: 'Operational Turnaround at HealthTech Co.',
+            client: 'MediSync Health',
+            outcome: 'SLA compliance from 72% to 98%',
+            details: 'Restructured engineering operations, implemented Agile-at-scale methodologies, and established PMO governance frameworks. Reduced critical incident response time by 65%.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollapsibleCaseStudy({required String title, required String client, required String outcome, required String details}) {
+    return Card(
+      elevation: 0, color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.lightBorder)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF134E40))),
+                      const SizedBox(height: 4),
+                      Text(client, style: GoogleFonts.inter(fontSize: 12, color: AppColors.lightTextSecondary)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.expand_more, color: const Color(0xFF134E40)),
+                  onPressed: () { setState(() {}); }, // simplified toggle
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(6)),
+              child: Text(outcome, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF0EB59A), fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 12),
+            Text(details, style: GoogleFonts.inter(fontSize: 12, color: AppColors.lightTextSecondary, height: 1.4)),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRateAvailabilityTab(AdvisorModel advisor) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Card(
+            elevation: 0, color: const Color(0xFF134E40),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Scope & Retainer Options', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  Text('Secured via PMO Escrow Milestones', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF0EB59A))),
+                  const SizedBox(height: 20),
+                  _buildRetainerCard(title: 'Advisory Retainer', price: '₹1.5L / mo', hours: '10 hrs / week', isSelected: true),
+                  const SizedBox(height: 12),
+                  _buildRetainerCard(title: 'Fractional Operator', price: '₹2.8L / mo', hours: '20 hrs / week', isSelected: false),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            elevation: 0, color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Availability', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                  const SizedBox(height: 12),
+                  _buildInfoRow('Status', 'Available (Immediate)'),
+                  _buildInfoRow('Hours', '20-40 hrs / week'),
+                  _buildInfoRow('Time Zone', 'IST (GMT+5:30)'),
+                  _buildInfoRow('Preferred Engagement', 'Fractional / Advisory'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 13, color: AppColors.lightTextSecondary)),
+          Text(value, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+        ],
       ),
     );
   }
@@ -7994,11 +8442,22 @@ class _EscrowFinancialControlViewState extends ConsumerState<EscrowFinancialCont
   }
 }
 
-class AnalyticsHubView extends ConsumerWidget {
+class AnalyticsHubView extends ConsumerStatefulWidget {
   const AnalyticsHubView({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnalyticsHubView> createState() => _AnalyticsHubViewState();
+}
+
+class _AnalyticsHubViewState extends ConsumerState<AnalyticsHubView> {
+  String _activeTab = 'Overview';
+
+  final List<String> _tabs = [
+    'Overview', 'Hiring', 'Talent Pool', 'Engagement', 'Financial', 'Performance', 'Pipeline', 'Reports',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F5),
       body: SingleChildScrollView(
@@ -8023,135 +8482,176 @@ class AnalyticsHubView extends ConsumerWidget {
                   color: AppColors.lightTextSecondary,
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(child: _buildMetricCard('₹22.5L', 'Total Project Capital', '+12.4% vs last mo', Colors.green)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildMetricCard('2.4 days', 'Avg Sourcing SLA', '-1.1 days improvement', Colors.blue)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildMetricCard('96.4%', 'Milestone Health Score', 'Excellent SLA Delivery', const Color(0xFF0EB59A))),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Card(
-                      elevation: 0,
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: AppColors.lightBorder),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Monthly Capital Expenditure',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF134E40),
-                                  ),
-                                ),
-                                Text('FY 2026', style: GoogleFonts.inter(fontSize: 12, color: AppColors.lightTextSecondary)),
-                              ],
+              const SizedBox(height: 20),
+              // 8-tab sub-navigation bar
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: _tabs.map((tab) {
+                    final isSelected = _activeTab == tab;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: InkWell(
+                        onTap: () { setState(() { _activeTab = tab; }); },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFF134E40) : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: isSelected ? const Color(0xFF134E40) : AppColors.lightBorder),
+                          ),
+                          child: Text(
+                            tab,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.white : AppColors.lightTextSecondary,
                             ),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              height: 180,
-                              width: double.infinity,
-                              child: SparklineWidget(
-                                data: const [1.2, 1.5, 1.4, 1.8, 2.2, 2.5],
-                                color: const Color(0xFF0EB59A),
-                                width: double.infinity,
-                                height: 180,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: const [
-                                Text('Jan', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                Text('Feb', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                Text('Mar', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                Text('Apr', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                Text('May', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                Text('Jun', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                              ],
-                            )
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    flex: 2,
-                    child: Card(
-                      elevation: 0,
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: AppColors.lightBorder),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Content sections based on active tab
+              if (_activeTab == 'Overview') ...[
+                _buildOverviewContent(),
+              ] else if (_activeTab == 'Hiring') ...[
+                _buildSectionPlaceholder('Hiring Analytics', 'Track hiring velocity, time-to-fill, and candidate pipeline metrics.'),
+              ] else if (_activeTab == 'Talent Pool') ...[
+                _buildSectionPlaceholder('Talent Pool', 'View your vetted talent pool composition, skill distribution, and availability.'),
+              ] else if (_activeTab == 'Engagement') ...[
+                _buildSectionPlaceholder('Engagement Analytics', 'Monitor engagement health, SLA compliance, and milestone completion rates.'),
+              ] else if (_activeTab == 'Financial') ...[
+                _buildSectionPlaceholder('Financial Overview', 'Budget utilization, escrow balances, and projected spend analysis.'),
+              ] else if (_activeTab == 'Performance') ...[
+                _buildSectionPlaceholder('Performance Metrics', 'Expert performance scores, deliverable quality ratings, and feedback summaries.'),
+              ] else if (_activeTab == 'Pipeline') ...[
+                _buildSectionPlaceholder('Pipeline Analytics', 'Requirement pipeline, matching velocity, and conversion funnel metrics.'),
+              ] else if (_activeTab == 'Reports') ...[
+                _buildSectionPlaceholder('Reports & Exports', 'Generate custom reports, download audit trails, and export analytics data.'),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverviewContent() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildMetricCard('₹22.5L', 'Total Project Capital', '+12.4% vs last mo', Colors.green)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildMetricCard('2.4 days', 'Avg Sourcing SLA', '-1.1 days improvement', Colors.blue)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildMetricCard('96.4%', 'Milestone Health Score', 'Excellent SLA Delivery', const Color(0xFF0EB59A))),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: Card(
+                elevation: 0, color: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Monthly Capital Expenditure', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                          Text('FY 2026', style: GoogleFonts.inter(fontSize: 12, color: AppColors.lightTextSecondary)),
+                        ],
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Investment Allocations',
-                              style: GoogleFonts.outfit(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF134E40),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Center(
-                              child: DonutChartWidget(
-                                size: 130,
-                                strokeWidth: 14,
-                                segments: [
-                                  DonutSegment(value: 50, color: const Color(0xFF134E40), label: 'CTO / Engineering'),
-                                  DonutSegment(value: 30, color: const Color(0xFF0EB59A), label: 'CFO / Finance'),
-                                  DonutSegment(value: 20, color: const Color(0xFFF59E0B), label: 'CMO / Growth'),
-                                ],
-                                centerWidget: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '₹22.5L',
-                                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF134E40)),
-                                    ),
-                                    Text(
-                                      'Disbursed',
-                                      style: GoogleFonts.inter(fontSize: 10, color: AppColors.lightTextSecondary),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            _buildLegendItem(const Color(0xFF134E40), 'CTO & Product (50%)'),
-                            _buildLegendItem(const Color(0xFF0EB59A), 'Finance & M&A (30%)'),
-                            _buildLegendItem(const Color(0xFFF59E0B), 'CMO & Marketing (20%)'),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: 180, width: double.infinity,
+                        child: SparklineWidget(data: const [1.2, 1.5, 1.4, 1.8, 2.2, 2.5], color: const Color(0xFF0EB59A), width: double.infinity, height: 180),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: const [
+                        Text('Jan', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        Text('Feb', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        Text('Mar', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        Text('Apr', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        Text('May', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        Text('Jun', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      ]),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              flex: 2,
+              child: Card(
+                elevation: 0, color: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Investment Allocations', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                      const SizedBox(height: 20),
+                      Center(
+                        child: DonutChartWidget(
+                          size: 130, strokeWidth: 14,
+                          segments: [
+                            DonutSegment(value: 50, color: const Color(0xFF134E40), label: 'CTO / Engineering'),
+                            DonutSegment(value: 30, color: const Color(0xFF0EB59A), label: 'CFO / Finance'),
+                            DonutSegment(value: 20, color: const Color(0xFFF59E0B), label: 'CMO / Growth'),
                           ],
+                          centerWidget: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('₹22.5L', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                              Text('Disbursed', style: GoogleFonts.inter(fontSize: 10, color: AppColors.lightTextSecondary)),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                      _buildLegendItem(const Color(0xFF134E40), 'CTO & Product (50%)'),
+                      _buildLegendItem(const Color(0xFF0EB59A), 'Finance & M&A (30%)'),
+                      _buildLegendItem(const Color(0xFFF59E0B), 'CMO & Marketing (20%)'),
+                    ],
                   ),
-                ],
+                ),
               ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionPlaceholder(String title, String subtitle) {
+    return Card(
+      elevation: 0, color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.lightBorder)),
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.analytics_outlined, size: 48, color: AppColors.lightTextSecondary.withOpacity(0.5)),
+              const SizedBox(height: 16),
+              Text(title, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+              const SizedBox(height: 8),
+              Text(subtitle, textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.lightTextSecondary)),
             ],
           ),
         ),
@@ -8528,8 +9028,7 @@ class _MessagingHubViewState extends State<MessagingHubView> {
                       ),
                       ElevatedButton(
                         onPressed: () {
-                          context.go('/meetings');
-                          Forms.showSuccessToast(context, 'Redirecting to Scheduled Meetings to book slot...');
+                          _showSyncSchedulerModal();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF134E40),
@@ -8669,11 +9168,13 @@ class _MessagingHubViewState extends State<MessagingHubView> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.sentiment_satisfied_alt, color: AppColors.lightTextSecondary),
-                        onPressed: () {
-                          Forms.showSuccessToast(context, 'Mock Emoji Drawer Opened');
-                        },
+                      Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.sentiment_satisfied_alt, color: AppColors.lightTextSecondary),
+                            onPressed: () => _showEmojiPicker(),
+                          ),
+                        ],
                       ),
                       const SizedBox(width: 8),
                       Container(
@@ -8694,6 +9195,198 @@ class _MessagingHubViewState extends State<MessagingHubView> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showEmojiPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Container(
+          height: 320,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Emoji', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                  IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => Navigator.of(ctx).pop()),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: GridView.count(
+                  crossAxisCount: 8,
+                  childAspectRatio: 1,
+                  children: '😀😂😍🤔😎🙌👍❤️🔥🎉💯⭐🌈🎨🎶🚀💡🎯🏆💎🌟✨🔥🎈🎁🎊🤩😇🙏💪🦄🍀🌻⭐️💫⚡️🎵🧠👑📈💼🤝🌍⚙️🔒📊🔑💡'.split('').map((emoji) {
+                    return InkWell(
+                      onTap: () {
+                        final currentText = _msgController.text;
+                        final cursorPos = _msgController.selection.baseOffset;
+                        if (cursorPos >= 0 && cursorPos <= currentText.length) {
+                          _msgController.text = '${currentText.substring(0, cursorPos)}$emoji${currentText.substring(cursorPos)}';
+                          _msgController.selection = TextSelection.collapsed(offset: cursorPos + emoji.length);
+                        } else {
+                          _msgController.text = currentText + emoji;
+                        }
+                        Navigator.of(ctx).pop();
+                      },
+                      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 24))),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSyncSchedulerModal() {
+    String topic = '';
+    DateTime selectedDate = DateTime.now();
+    String duration = '30min';
+    String platform = 'Google Meet';
+    int hour = 10;
+    int minute = 0;
+    String amPm = 'AM';
+    String agenda = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        int step = 1;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(step == 1 ? 'Step 1: Topic & Platform' : 'Step 2: Schedule Time', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF134E40))),
+                        IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => Navigator.of(ctx).pop()),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (step == 1) ...[
+                      TextField(
+                        decoration: const InputDecoration(labelText: 'Topic', border: OutlineInputBorder()),
+                        onChanged: (v) => topic = v,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_month, size: 16),
+                              label: Text('${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'),
+                              onPressed: () async {
+                                final picked = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+                                if (picked != null) { setModalState(() { selectedDate = picked; }); }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: duration,
+                        items: ['30min', '45min', '60min'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                        onChanged: (v) { if (v != null) { setModalState(() { duration = v; }); } },
+                        decoration: const InputDecoration(labelText: 'Duration', border: OutlineInputBorder()),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: platform,
+                        items: ['Google Meet', 'Zoom'].map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                        onChanged: (v) { if (v != null) { setModalState(() { platform = v; }); } },
+                        decoration: const InputDecoration(labelText: 'Platform', border: OutlineInputBorder()),
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              value: hour,
+                              items: List.generate(12, (i) => i + 1).map((h) => DropdownMenuItem(value: h, child: Text(h.toString().padLeft(2, '0')))).toList(),
+                              onChanged: (v) { if (v != null) { setModalState(() { hour = v; }); } },
+                              decoration: const InputDecoration(labelText: 'Hour', border: OutlineInputBorder()),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              value: minute,
+                              items: [0, 15, 30, 45].map((m) => DropdownMenuItem(value: m, child: Text(m.toString().padLeft(2, '0')))).toList(),
+                              onChanged: (v) { if (v != null) { setModalState(() { minute = v; }); } },
+                              decoration: const InputDecoration(labelText: 'Minute', border: OutlineInputBorder()),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: amPm,
+                              items: ['AM', 'PM'].map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                              onChanged: (v) { if (v != null) { setModalState(() { amPm = v; }); } },
+                              decoration: const InputDecoration(labelText: '', border: OutlineInputBorder()),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        maxLines: 4,
+                        decoration: const InputDecoration(labelText: 'Agenda', border: OutlineInputBorder(), alignLabelWithHint: true),
+                        onChanged: (v) => agenda = v,
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (step == 2)
+                          TextButton(
+                            onPressed: () { setModalState(() { step = 1; }); },
+                            child: const Text('Back'),
+                          )
+                        else
+                          const SizedBox.shrink(),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (step == 1) {
+                              setModalState(() { step = 2; });
+                            } else {
+                              Navigator.of(ctx).pop();
+                              Forms.showSuccessToast(context, 'Meeting scheduled successfully!');
+                              context.go('/meetings');
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF134E40), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+                          child: Text(step == 1 ? 'Next' : 'Confirm & Schedule', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
